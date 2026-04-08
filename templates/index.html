@@ -525,10 +525,19 @@ input[type="range"] {
 
 </head>
 <body>
+<!-- Add this at the top of index.html body -->
+<div style="background: #667eea; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h1 style="margin: 0; font-size: 20px;">📄 RecoForge</h1>
+    <div>
+        <a href="{{ url_for('dashboard') }}" style="color: white; text-decoration: none; margin-right: 20px; opacity: 0.9;">← Back to Templates</a>
+        <span style="opacity: 0.9;">{{ current_user.username }}</span>
+    </div>
+</div>
 
 <div class="container">
 
-<h2>Word Record Generator</h2>
+<h2>Template Creation</h2>
+
 
 <form method="POST" id="mainForm" enctype="multipart/form-data">
 
@@ -572,6 +581,28 @@ input[type="range"] {
 <input type="hidden" name="headings" id="headingsData">
 
 <br><br>
+<!-- Add this at the top of the share panel -->
+<!-- Save Section with Name Input -->
+<div style="margin-bottom: 20px; padding: 16px; background: #e8f5e9; border-radius: 8px; border: 2px solid #4CAF50;">
+    <p style="margin: 0 0 12px 0; font-weight: 600; color: #2e7d32;">
+        💾 Save Your Work
+    </p>
+
+    <!-- Template Name Input -->
+    <label style="display: block; margin-bottom: 12px; font-weight: 500; color: #333;">
+        Template Name:
+        <input type="text" id="templateNameInput" placeholder="Enter template name..."
+               style="width: 100%; margin-top: 6px; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px;"
+               value="My Template">
+    </label>
+
+    <button type="button" class="btn btn-success" onclick="saveTemplateOnly()" style="width: 100%; margin: 0;">
+        Save Template
+    </button>
+    <div id="saveOnlyMsg" class="message" style="margin-top: 12px; display: none;"></div>
+</div>
+
+<hr style="border-color: #ffcc80; margin: 16px 0;">
 
 <div style="display: flex; gap: 12px; flex-wrap: wrap;">
     <button type="submit" class="btn btn-success" style="flex: 2; min-width: 200px; font-size: 18px; padding: 16px;">
@@ -590,6 +621,7 @@ input[type="range"] {
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
         <h3 style="margin: 0; color: #e65100;">📤 Share / 📥 Load Template</h3>
         <button type="button" onclick="toggleSharePanel()" style="background: none; border: none; font-size: 24px; cursor: pointer; padding: 4px; width: auto; min-height: auto;">✕</button>
+
     </div>
 
     <div style="margin-bottom: 20px;">
@@ -618,6 +650,56 @@ input[type="range"] {
 
     <div class="message" id="successMsg" style="margin-top: 12px;"></div>
     <div class="message" id="errorMsg" style="margin-top: 12px;"></div>
+
+        <hr style="border-color: #ffcc80; margin: 16px 0;">
+
+        <div style="background: #e3f2fd; padding: 16px; border-radius: 8px; border: 2px solid var(--primary-color);">
+        <p style="margin: 0 0 12px 0; font-weight: 600; color: #1565c0;">
+            📄 Import Content
+        </p>
+
+        <!-- Tab switching -->
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <button type="button" id="tabFileBtn" onclick="switchImportTab('file')" class="btn btn-primary" style="flex: 1; margin: 0; background: #1565c0; opacity: 1;">
+                📁 From File
+            </button>
+            <button type="button" id="tabTextBtn" onclick="switchImportTab('text')" class="btn btn-secondary" style="flex: 1; margin: 0; background: #757575;">
+                ✏️ From Text
+            </button>
+        </div>
+
+        <!-- File Upload Section -->
+        <div id="importFileSection">
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #555;">
+                Upload a .docx file with matching headings
+            </p>
+            <input type="file" id="importDocFile" accept=".docx" style="margin-bottom: 12px; background: white;">
+            <button type="button" class="btn btn-primary" onclick="importFromDocument()" style="width: 100%; margin: 0; background: #1565c0;">
+                🔄 Import from File
+            </button>
+        </div>
+
+        <!-- Text Input Section -->
+        <div id="importTextSection" style="display: none;">
+            <p style="margin: 0 0 12px 0; font-size: 14px; color: #555;">
+                Paste text with headings matching your template
+            </p>
+            <textarea id="importTextArea" rows="8" placeholder="Paste your content here...
+
+Example:
+Introduction
+This is the intro text.
+
+Methodology
+This is the method section." style="margin-bottom: 12px; font-family: monospace; font-size: 14px; width: 100%;"></textarea>
+            <button type="button" class="btn btn-primary" onclick="importFromText()" style="width: 100%; margin: 0; background: #1565c0;">
+                🔄 Import from Text
+            </button>
+        </div>
+
+        <div class="message" id="importSuccessMsg" style="margin-top: 12px; display: none;"></div>
+        <div class="message" id="importErrorMsg" style="margin-top: 12px; display: none;"></div>
+    </div>
 </div>
 
 </form>
@@ -686,6 +768,69 @@ input[type="range"] {
 </div>
 
 <script>
+    function saveTemplateOnly() {
+    let templateData = collectTemplateData();
+    if(templateData.headings.length === 0) {
+        showError("Create at least one heading first!");
+        return;
+    }
+
+    // Check if we already have a template code (editing existing)
+    let existingCode = document.getElementById('generatedCode')?.textContent?.trim();
+    if (existingCode && existingCode.length === 8) {
+        templateData.template_code = existingCode;
+    }
+
+    // Get template name from input field
+let templateName = document.getElementById('templateNameInput').value.trim();
+if (!templateName) {
+    templateName = "My Template"; // Default if empty
+}
+
+templateData.template_name = templateName;
+
+    // Show saving state
+    let btn = event.target;
+    let originalText = btn.textContent;
+    btn.textContent = "⏳ Saving...";
+    btn.disabled = true;
+
+    fetch('/save_template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(templateData)
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+
+        if(data.success) {
+            // Show the code if it's a new template
+            if (!existingCode) {
+                document.getElementById('generatedCode').textContent = data.code;
+                document.getElementById('codeDisplayArea').classList.remove('hidden');
+            }
+
+            showSaveOnlyMsg("Template saved successfully!", "success");
+        } else {
+            showSaveOnlyMsg("Error: " + data.error, "error");
+        }
+    })
+    .catch(err => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        showSaveOnlyMsg("Network error: " + err, "error");
+    });
+}
+
+function showSaveOnlyMsg(msg, type) {
+    let el = document.getElementById('saveOnlyMsg');
+    el.textContent = msg;
+    el.className = 'message ' + type;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 3000);
+}
     function getLastHeadingSettings() {
     for (let i = headingCount - 1; i >= 0; i--) {
 
@@ -1489,6 +1634,16 @@ function generateShareCode() {
         showError("Create at least one heading first!");
         return;
     }
+
+    // Ask for template name
+    // Get template name from input field
+let templateName = document.getElementById('templateNameInput').value.trim();
+if (!templateName) {
+    templateName = "My Template"; // Default if empty
+}
+
+    templateData.template_name = templateName;
+
     fetch('/save_template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1499,7 +1654,7 @@ function generateShareCode() {
         if(data.success) {
             document.getElementById('generatedCode').textContent = data.code;
             document.getElementById('codeDisplayArea').classList.remove('hidden');
-            showSuccess("Code generated! Share it to load on another device.");
+            showSuccess("Template saved! Code: " + data.code);
         } else {
             showError("Error: " + data.error);
         }
@@ -1608,14 +1763,21 @@ function collectTemplateData() {
 }
 
 function applyTemplate(template) {
+    // Clear existing headings
     document.getElementById('headingContainer').innerHTML = '';
+
+    // Reset heading count to 0 before rebuilding
     headingCount = 0;
+
+    // Apply settings
     document.getElementById("borderCheck").checked = template.border || false;
     if(template.layout) {
         document.getElementById("layoutSelect").value = template.layout;
     } else {
-        document.getElementById("layoutSelect").value = "narrow"; // default
+        document.getElementById("layoutSelect").value = "narrow";
     }
+
+    // Apply watermark
     if(template.watermark) {
         document.getElementById("wmcheck").checked = true;
         document.getElementById("wmtext").classList.remove("hidden");
@@ -1625,30 +1787,41 @@ function applyTemplate(template) {
         document.getElementById("wmtext").classList.add("hidden");
         document.getElementById("watermarkText").value = "";
     }
-    (template.headings || []).forEach((item, index) => {
-        if(item.is_footer) {
-            createFooterFromData(item, index);
-        } else {
-            createHeadingFromData(item, index);
-        }
-    });
-    headingCount = template.headings ? template.headings.length : 0;
+
+    // Build headings with sequential IDs starting from 0
+    if (template.headings && template.headings.length > 0) {
+        template.headings.forEach((item, index) => {
+            headingCount = index; // Set to current index before creating
+            if(item.is_footer) {
+                createFooterFromData(item, index);
+            } else {
+                createHeadingFromData(item, index);
+            }
+        });
+        // Set headingCount to total after all created
+        headingCount = template.headings.length;
+    }
+
+    // Display the code if available
+    if (template.template_code || template.code) {
+        let code = template.template_code || template.code;
+        document.getElementById('generatedCode').textContent = code;
+        document.getElementById('codeDisplayArea').classList.remove('hidden');
+    }
 }
 
 function createFooterFromData(item, id) {
     let div = document.createElement('div');
     div.innerHTML = `
     <div class="headingBox is-footer" id="box${id}" data-is-footer="true">
-               <div class="headingHeader" onclick="toggleSection(${id})">
+        <div class="headingHeader" onclick="toggleSection(${id})">
             <span>Footer <span class="footer-badge">PAGE FOOTER</span></span>
             <button type="button" class="btn btn-danger" onclick="deleteHeading(${id}, event)" style="padding: 4px 12px; font-size: 12px; width: auto; min-height: 32px; margin: 0;">🗑️ Delete</button>
         </div>
         <div class="headingContent active" id="content${id}">
-
             <label><strong>Footer Text:</strong>
                 <input type="text" id="text${id}" value="${escapeHtml(item.text)}" placeholder="Enter footer text here">
             </label>
-
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0;">
                 <label>Font:
                     <select id="font${id}">
@@ -1657,25 +1830,19 @@ function createFooterFromData(item, id) {
                         <option ${item.font==='Arial Black'?'selected':''}>Arial Black</option>
                         <option ${item.font==='Times New Roman'?'selected':''}>Times New Roman</option>
                         <option ${item.font==='Courier New'?'selected':''}>Courier New</option>
-
                     </select>
                 </label>
                 <label>Size:
-                    <input type="number" id="size${id}" value="${settings.size}" min="6" max="72">
+                    <input type="number" id="size${id}" value="${item.size || 10}" min="6" max="72">
                 </label>
             </div>
-
-            <!-- Hidden alignment - always left -->
             <input type="hidden" id="footerAlign${id}" value="left">
-
             <hr style="margin: 16px 0;">
-
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0;">
                 <label style="flex: 1; min-width: 120px; font-weight: 600;">Before Lines:
-                    <input type="number" id="hBefore${id}" value="${item.before_lines||'0'}" min="0" placeholder="Lines before footer">
+                    <input type="number" id="hBefore${id}" value="${item.before_lines||'0'}" min="0">
                 </label>
             </div>
-
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <label style="flex: 1; min-width: 120px;">Lines after:
                     <input type="number" id="lines${id}" value="${item.spacing==='till_end'?'0':(item.spacing||'0')}" ${item.spacing==='till_end'?'disabled style="opacity:0.4"':''}>
@@ -1685,14 +1852,11 @@ function createFooterFromData(item, id) {
                     <span style="margin-left: 8px;">Till End</span>
                 </label>
             </div>
-
             <hr style="margin: 16px 0;">
-
             <label style="font-weight: 600;">
                 <input type="checkbox" id="textEnable${id}" onchange="toggleText(${id})" ${item.text_enabled?'checked':''}>
                 Enable Text Block
             </label>
-
             <div id="textBlock${id}" class="${item.text_enabled?'':'hidden'}" style="margin-top: 12px; padding: 12px; background: #f9f9f9; border-radius: 6px;">
                 <label>Before Lines:
                     <input type="number" id="tBefore${id}" value="${item.text_before||'0'}">
@@ -1721,7 +1885,6 @@ function createFooterFromData(item, id) {
                     Till End
                 </label>
             </div>
-
             <input type="hidden" id="isFooter${id}" value="true">
             <input type="hidden" id="imageEnable${id}">
         </div>
@@ -1729,21 +1892,20 @@ function createFooterFromData(item, id) {
     `;
     document.getElementById('headingContainer').appendChild(div.firstElementChild);
 }
+
 function createHeadingFromData(item, id) {
     let div = document.createElement('div');
     div.innerHTML = `
     <div class="headingBox" id="box${id}">
-                <div class="headingHeader" onclick="toggleSection(${id})">
+        <div class="headingHeader" onclick="toggleSection(${id})">
             <span>Heading ${id+1}</span>
             <button type="button" class="btn btn-danger" onclick="deleteHeading(${id}, event)" style="padding: 4px 12px; font-size: 12px; width: auto; min-height: 32px; margin: 0;">🗑️ Delete</button>
         </div>
         <div class="headingContent active" id="content${id}">
-
             <label><strong>Heading Text:</strong>
                 <input type="text" id="text${id}" value="${escapeHtml(item.text)}" placeholder="Enter heading text">
             </label>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 12px 0; align-items: end;">
                 <label>Font:
                     <select id="font${id}">
                         <option ${item.font==='Calibri'?'selected':''}>Calibri</option>
@@ -1754,36 +1916,35 @@ function createHeadingFromData(item, id) {
                     </select>
                 </label>
                 <label>Size:
-                    <input type="number" id="size${id}" value="${settings.size}"
+                    <input type="number" id="size${id}" value="${item.size || 16}" min="6" max="72">
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+                    <input type="checkbox" id="bold${id}" onchange="toggleBoldStyle(${id})" ${item.bold?'checked':''} style="width: 20px; height: 20px;">
+                    <span style="font-weight: bold; font-size: 16px;">Bold</span>
                 </label>
             </div>
-
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0;">
                 <label style="flex: 1; min-width: 120px; font-weight: 600;">Before Lines:
-                    <input type="number" id="hBefore${id}" value="${item.before_lines||'0'}" min="0" placeholder="Lines before heading">
+                    <input type="number" id="hBefore${id}" value="${item.before_lines||'0'}" min="0">
                 </label>
             </div>
-
             <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
                 <label style="flex: 1; min-width: 120px;">Lines after:
-                    <input type="number" id="lines${id}" value="${item.spacing==='till_end'?'1':item.spacing}" ${item.spacing==='till_end'?'disabled style="opacity:0.4"':''}>
+                    <input type="number" id="lines${id}" value="${item.spacing==='till_end'?'1':(item.spacing || '1')}" ${item.spacing==='till_end'?'disabled style="opacity:0.4"':''}>
                 </label>
                 <label style="display: flex; align-items: center; margin: 0;">
                     <input type="checkbox" id="mode${id}" onclick="spacingModeChange(${id})" ${item.spacing==='till_end'?'checked':''}>
                     <span style="margin-left: 8px;">Till End</span>
                 </label>
             </div>
-
             <hr style="margin: 16px 0;">
-
             <label style="font-weight: 600;">
                 <input type="checkbox" id="textEnable${id}" onchange="toggleText(${id})" ${item.text_enabled?'checked':''}>
                 Enable Text Block
             </label>
-
             <div id="textBlock${id}" class="${item.text_enabled?'':'hidden'}" style="margin-top: 12px; padding: 12px; background: #f9f9f9; border-radius: 6px;">
                 <label>Before Lines:
-                    <input type="number" id="tBefore${id}" value="${item.text_before}">
+                    <input type="number" id="tBefore${id}" value="${item.text_before||'0'}">
                 </label>
                 <label>Content:
                     <textarea id="tContent${id}" rows="4" placeholder="Enter text content...">${escapeHtml(item.text_content)}</textarea>
@@ -1792,37 +1953,34 @@ function createHeadingFromData(item, id) {
                     <label>Font:
                         <select id="tFont${id}">
                             <option ${item.text_font==='Calibri'?'selected':''}>Calibri</option>
-                            <option ${item.text_font==='Arial'?'selected':''}>Arial</option>
-                            <option ${item.text_font==='Arial Black'?'selected':''}>Arial Black</option>
-                            <option ${item.text_font==='Times New Roman'?'selected':''}>Times New Roman</option>
+                            <option ${item.font==='Arial'?'selected':''}>Arial</option>
+                            <option ${item.font==='Arial Black'?'selected':''}>Arial Black</option>
+                            <option ${item.font==='Times New Roman'?'selected':''}>Times New Roman</option>
                         </select>
                     </label>
                     <label>Size:
-                        <input type="number" id="tSize${id}" value="${item.text_size}">
+                        <input type="number" id="tSize${id}" value="${item.text_size||'12'}">
                     </label>
                 </div>
                 <label style="margin-top: 12px;">After Lines:
-                    <input type="number" id="tAfter${id}" value="${item.text_after}">
+                    <input type="number" id="tAfter${id}" value="${item.text_after||'0'}">
                 </label>
                 <label style="margin-top: 8px;">
                     <input type="checkbox" id="tMode${id}" ${item.text_till_end?'checked':''}>
                     Till End
                 </label>
             </div>
-
             <hr style="margin: 16px 0;">
-
             <label style="font-weight: 600;">
                 <input type="checkbox" id="imageEnable${id}" onchange="toggleImage(${id})" ${item.image_enabled?'checked':''}>
                 Enable Image
             </label>
-
             <div id="imageBlock${id}" class="${item.image_enabled?'':'hidden'}" style="margin-top: 12px; padding: 12px; background: #f9f9f9; border-radius: 6px;">
                 <input type="file" id="imgFile${id}" accept="image/*" onchange="handleImageSelect(${id}, this)">
                 <input type="hidden" id="imgData${id}" value="${item.image_data||''}">
-                <input type="hidden" id="imgWidth${id}" value="${item.image_width}">
-                <input type="hidden" id="imgHeight${id}" value="${item.image_height}">
-                <input type="hidden" id="imgAfter${id}" value="${item.image_after}">
+                <input type="hidden" id="imgWidth${id}" value="${item.image_width||'4'}">
+                <input type="hidden" id="imgHeight${id}" value="${item.image_height||'3'}">
+                <input type="hidden" id="imgAfter${id}" value="${item.image_after||'0'}">
                 <input type="checkbox" id="imgTillEnd${id}" class="hidden" ${item.image_till_end?'checked':''}>
                 <div class="image-settings" id="imgSettings${id}" style="${item.image_data?'':'display:none;'} margin-top: 8px; color: #666; font-size: 14px;">
                     ${item.image_data?'📷 Image loaded from template':'📷 Select an image file'}
@@ -2148,6 +2306,282 @@ document.addEventListener('DOMContentLoaded', function() {
         closeImagePreview();
     });
 });
+
+// ==================== IMPORT CONTENT FROM DOCUMENT ====================
+
+function importFromDocument() {
+    let fileInput = document.getElementById('importDocFile');
+    let file = fileInput.files[0];
+
+    if(!file) {
+        showImportError("Please select a .docx file first!");
+        return;
+    }
+
+    // Collect current template headings
+    let headings = [];
+    for(let i=0; i<headingCount; i++){
+        let textEl = document.getElementById("text"+i);
+        if(!textEl) continue;
+        if(document.getElementById("box"+i)?.dataset.isFooter) continue;
+
+        headings.push({
+            id: i,
+            text: textEl.value || "",
+            is_footer: false
+        });
+    }
+
+    if(headings.length === 0) {
+        showImportError("Create at least one heading first!");
+        return;
+    }
+
+    // Prepare form data
+    let formData = new FormData();
+    formData.append('file', file);
+    formData.append('headings', JSON.stringify(headings));
+
+    // Show loading state
+    let btn = document.querySelector('#sharePanel button[onclick="importFromDocument()"]');
+    let originalText = btn.textContent;
+    btn.textContent = "⏳ Processing...";
+    btn.disabled = true;
+
+    fetch('/import_content', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+
+        if(data.success) {
+            let matchCount = 0;
+
+            // Fill in the content
+            for(let id in data.content_map) {
+                let content = data.content_map[id];
+                let textContentEl = document.getElementById("tContent" + id);
+                let textEnableEl = document.getElementById("textEnable" + id);
+                let textBlockEl = document.getElementById("textBlock" + id);
+
+                if(textContentEl && content) {
+                    // Enable text block if not already enabled
+                    if(textEnableEl && !textEnableEl.checked) {
+                        textEnableEl.checked = true;
+                        if(textBlockEl) textBlockEl.classList.remove('hidden');
+                    }
+
+                    // Set content
+                    textContentEl.value = content;
+                    matchCount++;
+                }
+            }
+
+            if(matchCount > 0) {
+                showImportSuccess(`Successfully imported content for ${matchCount} heading(s)!`);
+                // Close panel after 2 seconds
+                setTimeout(() => toggleSharePanel(), 2000);
+            } else {
+                showImportError("No matching headings found in document. Make sure your document headings match exactly.");
+            }
+        } else {
+            showImportError("Error: " + data.error);
+        }
+    })
+    .catch(err => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        showImportError("Network error: " + err);
+    });
+}
+
+function showImportSuccess(msg) {
+    let el = document.getElementById('importSuccessMsg');
+    el.textContent = msg;
+    el.className = 'message success';
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 5000);
+}
+
+function showImportError(msg) {
+    let el = document.getElementById('importErrorMsg');
+    el.textContent = msg;
+    el.className = 'message error';
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 5000);
+}
+
+// ==================== IMPORT TAB SWITCHING ====================
+
+function switchImportTab(tab) {
+    let fileSection = document.getElementById('importFileSection');
+    let textSection = document.getElementById('importTextSection');
+    let fileBtn = document.getElementById('tabFileBtn');
+    let textBtn = document.getElementById('tabTextBtn');
+
+    if(tab === 'file') {
+        fileSection.style.display = 'block';
+        textSection.style.display = 'none';
+        fileBtn.style.opacity = '1';
+        fileBtn.style.background = '#1565c0';
+        textBtn.style.opacity = '0.7';
+        textBtn.style.background = '#757575';
+    } else {
+        fileSection.style.display = 'none';
+        textSection.style.display = 'block';
+        fileBtn.style.opacity = '0.7';
+        fileBtn.style.background = '#757575';
+        textBtn.style.opacity = '1';
+        textBtn.style.background = '#1565c0';
+    }
+}
+
+// ==================== IMPORT FROM TEXT ====================
+
+function importFromText() {
+    let textArea = document.getElementById('importTextArea');
+    let rawText = textArea.value;
+
+    if(!rawText.trim()) {
+        showImportError("Please paste some text first!");
+        return;
+    }
+
+    // Collect current template headings
+    let headings = [];
+    for(let i=0; i<headingCount; i++){
+        let textEl = document.getElementById("text"+i);
+        if(!textEl) continue;
+        if(document.getElementById("box"+i)?.dataset.isFooter) continue;
+
+        headings.push({
+            id: i,
+            text: textEl.value || "",
+            is_footer: false
+        });
+    }
+
+    if(headings.length === 0) {
+        showImportError("Create at least one heading first!");
+        return;
+    }
+
+    // Show loading state
+    let btn = document.querySelector('#importTextSection button');
+    let originalText = btn.textContent;
+    btn.textContent = "⏳ Processing...";
+    btn.disabled = true;
+
+    fetch('/import_content_text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            text: rawText,
+            headings: headings
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+
+        if(data.success) {
+            let matchCount = 0;
+            let tillEndCount = 0;
+
+            // Import content
+            for(let id in data.content_map) {
+                let content = data.content_map[id];
+                let textContentEl = document.getElementById("tContent" + id);
+                let textEnableEl = document.getElementById("textEnable" + id);
+                let textBlockEl = document.getElementById("textBlock" + id);
+
+                if(textContentEl && content) {
+                    if(textEnableEl && !textEnableEl.checked) {
+                        textEnableEl.checked = true;
+                        if(textBlockEl) textBlockEl.classList.remove('hidden');
+                    }
+                    textContentEl.value = content;
+                    matchCount++;
+                }
+            }
+
+            // Handle Till End settings
+            if(data.till_end_map) {
+                for(let id in data.till_end_map) {
+                    if(data.till_end_map[id] === true) {
+                        let modeCheckbox = document.getElementById("mode" + id);
+                        let linesInput = document.getElementById("lines" + id);
+
+                        if(modeCheckbox && !modeCheckbox.checked) {
+                            modeCheckbox.checked = true;
+                            if(linesInput) {
+                                linesInput.disabled = true;
+                                linesInput.style.opacity = 0.4;
+                            }
+                            tillEndCount++;
+                        }
+                    }
+                }
+            }
+
+            if(matchCount > 0) {
+                let msg = `Successfully imported content for ${matchCount} heading(s)!`;
+                if(tillEndCount > 0) {
+                    msg += ` Auto-set "Till End" for ${tillEndCount} heading(s).`;
+                }
+                showImportSuccess(msg);
+                // Clear the textarea after successful import
+                textArea.value = '';
+                setTimeout(() => toggleSharePanel(), 2500);
+            } else {
+                showImportError("No matching headings found. Make sure your text contains headings that match your template.");
+            }
+        } else {
+            showImportError("Error: " + data.error);
+        }
+    })
+    .catch(err => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+        showImportError("Network error: " + err);
+    });
+}
+// ============================================
+// AUTO-LOAD TEMPLATE WHEN COMING FROM DASHBOARD
+// ============================================
+
+{% if load_template_code %}
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Auto-loading template: {{ load_template_code }}');
+
+    // Small delay to ensure all scripts are ready
+    setTimeout(function() {
+        document.getElementById('loadCodeInput').value = '{{ load_template_code }}';
+        loadTemplate();
+    }, 100);
+});
+{% endif %}
+// ============================================
+// AUTO-LOAD TEMPLATE WHEN COMING FROM DASHBOARD
+// ============================================
+
+{% if load_template_code %}
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Auto-loading template: {{ load_template_code }}');
+
+    // Set the code in the input
+    document.getElementById('loadCodeInput').value = '{{ load_template_code }}';
+
+    // Trigger the load after a short delay to ensure everything is ready
+    setTimeout(function() {
+        loadTemplate();
+    }, 200);
+});
+{% endif %}
 </script>
 
 </body>
