@@ -542,34 +542,44 @@ input[type="range"] {
 <form method="POST" id="mainForm" enctype="multipart/form-data">
 
 
-<label style="font-weight: 600;">
-    <input type="checkbox" name="border" id="borderCheck">
-    Add Page Border
-</label>
+<div class="headingBox" style="margin-bottom: 20px; border: 2px solid #667eea;">
+    <div class="headingHeader" id="pageSettingsHeader" onclick="togglePageSettings()" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+        <span>⚙️ Page Setup</span>
+        <span style="font-size: 12px; opacity: 0.9;">Click to expand/collapse</span>
+    </div>
+    <div class="headingContent active" id="pageSettingsContent">
 
-<br><br>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; margin: 0;">
+                <input type="checkbox" name="border" id="borderCheck" style="width: 20px; height: 20px;">
+                Page Border
+            </label>
 
-<label style="font-weight: 600;">
-    <input type="checkbox" id="wmcheck" onclick="toggleWM()">
-    Add Watermark
-</label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; margin: 0;">
+                <input type="checkbox" id="wmcheck" onclick="toggleWM()" style="width: 20px; height: 20px;">
+                Watermark
+            </label>
+        </div>
 
-<div id="wmtext" class="hidden" style="margin-top: 12px;">
-    <label>
-        Watermark Text:
-        <input type="text" name="watermark" id="watermarkText" placeholder="e.g., CONFIDENTIAL" style="margin-top: 8px;">
-    </label>
+        <div id="wmtext" class="hidden" style="margin-bottom: 16px; padding: 12px; background: #f5f5f5; border-radius: 6px;">
+            <label style="display: block; margin: 0;">
+                <span style="font-weight: 600; color: #555; margin-bottom: 6px; display: block;">Watermark Text:</span>
+                <input type="text" name="watermark" id="watermarkText" placeholder="e.g., CONFIDENTIAL" style="width: 100%; margin: 0;">
+            </label>
+        </div>
+
+        <div>
+            <label style="font-weight: 600; display: flex; align-items: center; gap: 8px; margin: 0;">
+                Page Layout:
+                <select name="layout" id="layoutSelect" style="flex: 1; min-width: 150px; font-size: 16px; padding: 8px; border-radius: 6px; border: 1px solid #ddd;">
+                    <option value="normal">Normal (1" margins)</option>
+                    <option value="narrow" selected>Narrow (0.5" margins)</option>
+                </select>
+            </label>
+        </div>
+
+    </div>
 </div>
-<div style="margin-top: 16px; margin-bottom: 8px;">
-    <label style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
-        Page Layout:
-        <select name="layout" id="layoutSelect" style="width: auto; min-width: 150px; font-size: 16px;">
-            <option value="normal">Normal (1" margins)</option>
-            <option value="narrow" selected>Narrow (0.5" margins)</option>
-        </select>
-    </label>
-</div>
-<hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
 
 <h3>Heading Builder</h3>
 
@@ -577,6 +587,7 @@ input[type="range"] {
 
 <button type="button" class="btn btn-primary" onclick="addHeading()">+ Add Heading</button>
 <button type="button" class="btn btn-footer" onclick="addFooter()">+ Add Footer</button>
+<button type="button" class="btn btn-secondary" onclick="addTable()" style="background: #9c27b0; color: white;">+ Add Table</button>
 
 <input type="hidden" name="headings" id="headingsData">
 
@@ -768,6 +779,30 @@ This is the method section." style="margin-bottom: 12px; font-family: monospace;
 </div>
 
 <script>
+    function renderTableForPreview(tableData) {
+    let html = '<table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11pt;">';
+
+    // Headers
+    html += '<thead><tr>';
+    tableData.headers.forEach(header => {
+        html += `<th style="border: 1px solid #333; padding: 8px; background: #667eea; color: white; font-weight: bold; text-align: left;">${escapeHtml(header)}</th>`;
+    });
+    html += '</tr></thead>';
+
+    // Rows
+    html += '<tbody>';
+    tableData.rows.forEach((row, idx) => {
+        html += '<tr>';
+        const bgColor = idx % 2 === 0 ? '#ffffff' : '#f5f5f5';
+        row.forEach(cell => {
+            html += `<td style="border: 1px solid #333; padding: 8px; background: ${bgColor};">${escapeHtml(cell || '')}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    return html;
+}
     function saveTemplateOnly() {
     let templateData = collectTemplateData();
     if(templateData.headings.length === 0) {
@@ -955,6 +990,201 @@ function addFooter() {
     `;
     document.getElementById('headingContainer').appendChild(div.firstElementChild);
     setTimeout(() => toggleSection(id), 100);
+}
+
+// ==================== TABLE FUNCTIONS ====================
+
+let currentTableData = null;
+
+function addTable() {
+    document.getElementById('tableModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeTableModal() {
+    document.getElementById('tableModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    // Reset
+    document.getElementById('tableInput').value = '';
+    document.getElementById('tablePreviewSection').style.display = 'none';
+    currentTableData = null;
+}
+
+function parseTableText(text) {
+    if (!text.trim()) return null;
+
+    const lines = text.trim().split('\n').filter(line => line.trim());
+    if (lines.length === 0) return null;
+
+    // Detect delimiter: use tab if present, otherwise use double space
+    const firstLine = lines[0];
+    const delimiter = firstLine.includes('\t') ? '\t' : '  ';  // Tab OR double space
+
+    // Parse headers
+    const headers = lines[0].trim().split(delimiter).map(h => h.trim()).filter(h => h);
+    const numCols = headers.length;
+
+    // Parse data rows
+    const rows = [];
+    for (let i = 1; i < lines.length; i++) {
+        // Handle multiple consecutive delimiters and trim each value
+        const values = lines[i].trim().split(delimiter).map(v => v.trim()).filter(v => v);
+
+        // Pad with empty strings if row has fewer values than headers
+        while (values.length < numCols) {
+            values.push('');
+        }
+        // Trim to match header count
+        rows.push(values.slice(0, numCols));
+    }
+
+    return { headers, rows };
+}
+
+function previewTable() {
+    const input = document.getElementById('tableInput').value;
+    const tableData = parseTableText(input);
+
+    if (!tableData) {
+        alert('Please enter valid table data');
+        return;
+    }
+
+    currentTableData = tableData;
+
+    // Generate preview HTML
+    let html = '<table style="width: 100%; border-collapse: collapse; background: white;">';
+
+    // Headers
+    html += '<thead><tr>';
+    tableData.headers.forEach(header => {
+        html += `<th style="border: 1px solid #ddd; padding: 12px; background: #667eea; color: white; font-weight: 600; text-align: left;">${escapeHtml(header)}</th>`;
+    });
+    html += '</tr></thead>';
+
+    // Rows
+    html += '<tbody>';
+    tableData.rows.forEach((row, idx) => {
+        html += '<tr>';
+        const bgColor = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
+        row.forEach(cell => {
+            html += `<td style="border: 1px solid #ddd; padding: 10px; background: ${bgColor};">${escapeHtml(cell)}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    document.getElementById('tablePreviewContainer').innerHTML = html;
+    document.getElementById('tablePreviewSection').style.display = 'block';
+}
+function updateTablePreview(id) {
+    const tableDataRaw = document.getElementById('tableData' + id).value;
+    try {
+        const tableData = JSON.parse(tableDataRaw);
+        const previewDiv = document.getElementById('tablePreview' + id);
+        if (previewDiv) {
+            previewDiv.innerHTML = generateTableHTML(tableData);
+        }
+    } catch(e) {
+        console.error('Error updating table preview:', e);
+    }
+}
+
+function addTableToDocument() {
+    if (!currentTableData) {
+        alert('Please preview the table first');
+        return;
+    }
+
+    const id = headingCount++;
+    const tableJSON = JSON.stringify(currentTableData);
+
+    const div = document.createElement('div');
+    div.innerHTML = `
+    <div class="headingBox" id="box${id}" data-is-table="true">
+        <div class="headingHeader" onclick="toggleSection(${id})">
+            <span>📊 Table <span style="background: #9c27b0; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">${currentTableData.headers.length} columns × ${currentTableData.rows.length} rows</span></span>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-primary" onclick="event.stopPropagation(); editTable(${id})" style="padding: 4px 12px; font-size: 12px; width: auto; min-height: 32px; margin: 0;">✏️ Edit</button>
+                <button type="button" class="btn btn-danger" onclick="deleteHeading(${id}, event)" style="padding: 4px 12px; font-size: 12px; width: auto; min-height: 32px; margin: 0;">🗑️ Delete</button>
+            </div>
+        </div>
+        <div class="headingContent active" id="content${id}">
+            <input type="hidden" id="tableData${id}" value='${tableJSON.replace(/'/g, "&apos;")}'>
+
+            <!-- LIVE PREVIEW SECTION -->
+            <div style="background: #f8f9fa; border: 2px solid #e9ecef; border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                <h4 style="margin: 0 0 12px 0; color: #495057; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px;">👁️ Preview</h4>
+                <div id="tablePreview${id}" style="overflow-x: auto; background: white; border-radius: 6px; border: 1px solid #dee2e6;">
+                    ${generateTableHTML(currentTableData)}
+                </div>
+            </div>
+
+            <div style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <label style="flex: 1; min-width: 120px;">Lines after:
+                    <input type="number" id="lines${id}" value="1" onchange="updateTablePreview(${id})">
+                </label>
+                <label style="display: flex; align-items: center; margin: 0;">
+                    <input type="checkbox" id="mode${id}" onclick="spacingModeChange(${id})">
+                    <span style="margin-left: 8px;">Till End</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    `;
+
+    document.getElementById('headingContainer').appendChild(div.firstElementChild);
+    closeTableModal();
+    setTimeout(() => toggleSection(id), 100);
+}
+
+function generateTableHTML(tableData) {
+    let html = '<table style="width: 100%; border-collapse: collapse; font-size: 14px;">';
+
+    // Headers
+    html += '<thead><tr>';
+    tableData.headers.forEach(header => {
+        html += `<th style="border: 1px solid #ddd; padding: 8px; background: #667eea; color: white; font-weight: 600;">${escapeHtml(header)}</th>`;
+    });
+    html += '</tr></thead>';
+
+    // Rows
+    html += '<tbody>';
+    tableData.rows.forEach((row, idx) => {
+        html += '<tr>';
+        const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';
+        row.forEach(cell => {
+            html += `<td style="border: 1px solid #ddd; padding: 8px; background: ${bgColor};">${escapeHtml(cell || '')}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    return html;
+}
+function renderTableForPreview(tableData) {
+    let html = '<table style="width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 11pt;">';
+
+    // Headers
+    html += '<thead><tr>';
+    tableData.headers.forEach(header => {
+        html += `<th style="border: 1px solid #333; padding: 8px; background: #667eea; color: white; font-weight: bold; text-align: left;">${escapeHtml(header)}</th>`;
+    });
+    html += '</tr></thead>';
+
+    // Rows
+    html += '<tbody>';
+    tableData.rows.forEach((row, idx) => {
+        html += '<tr>';
+        const bgColor = idx % 2 === 0 ? '#ffffff' : '#f5f5f5';
+        row.forEach(cell => {
+            html += `<td style="border: 1px solid #333; padding: 8px; background: ${bgColor};">${escapeHtml(cell || '')}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    return html;
 }
 // ==================== toggleshare ====================
 
@@ -1290,6 +1520,31 @@ function calculateTotalLinesForAllHeadings() {
         if (!document.getElementById('text' + i)) continue;
         if (document.getElementById('box' + i)?.dataset.isFooter) continue;
 
+        // Handle tables
+        if (document.getElementById('box' + i)?.dataset.isTable) {
+            let tableDataRaw = document.getElementById('tableData' + i)?.value;
+            if (tableDataRaw) {
+                try {
+                    let tableData = JSON.parse(tableDataRaw);
+                    // Estimate table height: 2 lines per row + 2 for header
+                    totalLines += (tableData.rows.length + 1) * 2;
+                } catch(e) {
+                    totalLines += 4; // Default estimate
+                }
+            }
+
+            // Add spacing after table
+            if (document.getElementById('mode' + i).checked) {
+                const currentPageLines = totalLines % LINES_PER_PAGE;
+                if (currentPageLines !== 0) {
+                    totalLines += LINES_PER_PAGE - currentPageLines;
+                }
+            } else {
+                totalLines += parseInt(document.getElementById('lines' + i)?.value) || 0;
+            }
+            continue;
+        }
+
         // Add heading before lines
         totalLines += parseInt(document.getElementById('hBefore' + i)?.value) || 0;
         totalLines += 1; // The heading itself
@@ -1345,6 +1600,138 @@ function calculateTotalLinesForAllHeadings() {
 
     return totalLines;
 }
+// ==================== EDIT TABLE FUNCTIONS ====================
+
+let currentEditingTableId = null;
+
+function editTable(id) {
+    currentEditingTableId = id;
+    const tableDataRaw = document.getElementById('tableData' + id).value;
+    const tableData = JSON.parse(tableDataRaw);
+
+    // Populate the edit modal
+    const textarea = document.getElementById('editTableInput');
+    // Convert back to tab-delimited format for editing
+    let lines = [tableData.headers.join('\t')];
+    tableData.rows.forEach(row => {
+        lines.push(row.join('\t'));
+    });
+    textarea.value = lines.join('\n');
+
+    // Show spacing settings
+    const spacing = document.getElementById('mode' + id).checked ? 'till_end' : (document.getElementById('lines' + id).value || '1');
+    document.getElementById('editTableSpacing').value = spacing === 'till_end' ? '1' : spacing;
+    document.getElementById('editTableTillEnd').checked = spacing === 'till_end';
+    toggleEditTableSpacing();
+
+    // Show the modal
+    document.getElementById('editTableModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeEditTableModal() {
+    document.getElementById('editTableModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    currentEditingTableId = null;
+}
+
+function toggleEditTableSpacing() {
+    const checkbox = document.getElementById('editTableTillEnd');
+    const input = document.getElementById('editTableSpacing');
+    if (checkbox.checked) {
+        input.disabled = true;
+        input.style.opacity = 0.4;
+    } else {
+        input.disabled = false;
+        input.style.opacity = 1;
+    }
+}
+
+function previewEditTable() {
+    const input = document.getElementById('editTableInput').value;
+    const tableData = parseTableText(input);
+
+    if (!tableData) {
+        alert('Please enter valid table data');
+        return;
+    }
+
+    // Generate preview HTML
+    let html = '<table style="width: 100%; border-collapse: collapse; background: white;">';
+
+    // Headers
+    html += '<thead><tr>';
+    tableData.headers.forEach(header => {
+        html += `<th style="border: 1px solid #ddd; padding: 12px; background: #667eea; color: white; font-weight: 600; text-align: left;">${escapeHtml(header)}</th>`;
+    });
+    html += '</tr></thead>';
+
+    // Rows
+    html += '<tbody>';
+    tableData.rows.forEach((row, idx) => {
+        html += '<tr>';
+        const bgColor = idx % 2 === 0 ? '#ffffff' : '#f9f9f9';
+        row.forEach(cell => {
+            html += `<td style="border: 1px solid #ddd; padding: 10px; background: ${bgColor};">${escapeHtml(cell)}</td>`;
+        });
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+
+    document.getElementById('editTablePreviewContainer').innerHTML = html;
+    document.getElementById('editTablePreviewSection').style.display = 'block';
+}
+
+function saveTableEdit() {
+    if (currentEditingTableId === null) return;
+
+    const input = document.getElementById('editTableInput').value;
+    const tableData = parseTableText(input);
+
+    if (!tableData) {
+        alert('Please enter valid table data');
+        return;
+    }
+
+    // Update the stored data
+    const tableJSON = JSON.stringify(tableData);
+    document.getElementById('tableData' + currentEditingTableId).value = tableJSON;
+
+    // Update spacing
+    const tillEnd = document.getElementById('editTableTillEnd').checked;
+    const spacingValue = document.getElementById('editTableSpacing').value;
+
+    document.getElementById('mode' + currentEditingTableId).checked = tillEnd;
+    document.getElementById('lines' + currentEditingTableId).value = spacingValue;
+
+    if (tillEnd) {
+        document.getElementById('lines' + currentEditingTableId).disabled = true;
+        document.getElementById('lines' + currentEditingTableId).style.opacity = 0.4;
+    } else {
+        document.getElementById('lines' + currentEditingTableId).disabled = false;
+        document.getElementById('lines' + currentEditingTableId).style.opacity = 1;
+    }
+
+    // Update the visual display in the heading box
+    updateTableDisplay(currentEditingTableId, tableData);
+
+    // Close modal
+    closeEditTableModal();
+
+    showSuccess('Table updated successfully!');
+}
+
+function updateTableDisplay(id, tableData) {
+    const box = document.getElementById('box' + id);
+    const headerSpan = box.querySelector('.headingHeader span');
+    headerSpan.innerHTML = `📊 Table <span style="background: #9c27b0; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">${tableData.headers.length} columns × ${tableData.rows.length} rows</span>`;
+
+    // Update the table HTML inside the content
+    const tableContainer = box.querySelector('.headingContent div');
+    if (tableContainer) {
+        tableContainer.innerHTML = generateTableHTML(tableData);
+    }
+}
 
 function renderPageContent(targetPageNum) {
     const pageContent = document.createElement('div');
@@ -1356,14 +1743,60 @@ function renderPageContent(targetPageNum) {
     let pageFull = false;
 
     for (let i = 0; i < headingCount; i++) {
-        if (!document.getElementById('text' + i)) continue;
+        const box = document.getElementById('box' + i);
+        if (!box) continue;
 
         // Skip footers for main content (they go at bottom)
-        if (document.getElementById('box' + i)?.dataset.isFooter) continue;
+        if (box.dataset.isFooter) continue;
+
+        // Handle tables - RENDER IN PREVIEW
+        if (box.dataset.isTable) {
+            let tableDataRaw = document.getElementById('tableData' + i)?.value;
+            if (tableDataRaw && currentLine < endLine) {
+                try {
+                    let tableData = JSON.parse(tableDataRaw);
+
+                    // Check if table starts on this page
+                    if (currentLine >= startLine) {
+                        let tableDiv = document.createElement('div');
+                        tableDiv.innerHTML = renderTableForPreview(tableData);
+                        pageContent.appendChild(tableDiv);
+                    }
+
+                    // Estimate table height (2 lines per row + 2 for header)
+                    let tableLines = (tableData.rows.length + 1) * 2;
+                    currentLine += tableLines;
+
+                    // Handle spacing after table
+                    let spacing = 0;
+                    if (document.getElementById('mode' + i).checked) {
+                        const currentPageLines = currentLine % LINES_PER_PAGE;
+                        spacing = currentPageLines === 0 ? 0 : LINES_PER_PAGE - currentPageLines;
+                    } else {
+                        spacing = parseInt(document.getElementById('lines' + i)?.value) || 0;
+                    }
+
+                    for (let s = 0; s < spacing && currentLine < endLine; s++) {
+                        if (currentLine >= startLine) {
+                            pageContent.appendChild(document.createElement('br'));
+                        }
+                        currentLine++;
+                    }
+                } catch(e) {
+                    console.error('Error rendering table:', e);
+                }
+            }
+            continue;
+        }
+
+        // For regular headings, check if text exists
+        if (!document.getElementById('text' + i)) continue;
+
         if (currentLine >= endLine) {
             pageFull = true;
             break;
         }
+
         // Calculate lines before this heading
         let headingBeforeLines = parseInt(document.getElementById('hBefore' + i)?.value) || 0;
         let headingStartLine = currentLine + headingBeforeLines;
@@ -1707,35 +2140,22 @@ function collectTemplateData() {
     let headings = [];
     for(let i=0; i<headingCount; i++){
         let textEl = document.getElementById("text"+i);
-        if(!textEl) continue;
+        let boxEl = document.getElementById("box"+i);
 
-        let isFooter = document.getElementById("box"+i)?.dataset.isFooter === "true";
+        if(!boxEl) continue;
+
+        let isFooter = boxEl.dataset.isFooter === "true";
+        let isTable = boxEl.dataset.isTable === "true";
 
         if(isFooter) {
             headings.push({
-            text: textEl.value || "",
-            font: document.getElementById("font"+i).value || "Calibri",
-            size: document.getElementById("size"+i).value || "10",
-            is_footer: true,
-            footer_align: document.getElementById("footerAlign"+i)?.value || "center",
-            before_lines: document.getElementById("hBefore"+i)?.value || "0",
-            spacing: document.getElementById("mode"+i).checked ? "till_end" : (document.getElementById("lines"+i).value || "0"),
-            text_enabled: document.getElementById("textEnable"+i).checked,
-            text_before: document.getElementById("tBefore"+i)?.value || "0",
-            text_content: document.getElementById("tContent"+i)?.value || "",
-            text_font: document.getElementById("tFont"+i)?.value || "Calibri",
-            text_size: document.getElementById("tSize"+i)?.value || "12",
-            text_after: document.getElementById("tAfter"+i)?.value || "0",
-            text_till_end: document.getElementById("tMode"+i)?.checked || false,
-            image_enabled: false
-        });
-    } else {
-            headings.push({
                 text: textEl.value || "",
                 font: document.getElementById("font"+i).value || "Calibri",
-                size: document.getElementById("size"+i).value || "16",
+                size: document.getElementById("size"+i).value || "10",
+                is_footer: true,
+                footer_align: document.getElementById("footerAlign"+i)?.value || "center",
                 before_lines: document.getElementById("hBefore"+i)?.value || "0",
-                spacing: document.getElementById("mode"+i).checked ? "till_end" : (document.getElementById("lines"+i).value || "1"),
+                spacing: document.getElementById("mode"+i).checked ? "till_end" : (document.getElementById("lines"+i).value || "0"),
                 text_enabled: document.getElementById("textEnable"+i).checked,
                 text_before: document.getElementById("tBefore"+i)?.value || "0",
                 text_content: document.getElementById("tContent"+i)?.value || "",
@@ -1743,6 +2163,35 @@ function collectTemplateData() {
                 text_size: document.getElementById("tSize"+i)?.value || "12",
                 text_after: document.getElementById("tAfter"+i)?.value || "0",
                 text_till_end: document.getElementById("tMode"+i)?.checked || false,
+                image_enabled: false
+            });
+        } else if (isTable) {
+            // Table type
+            let tableDataRaw = document.getElementById("tableData"+i).value;
+            let tableData = JSON.parse(tableDataRaw);
+
+            headings.push({
+                is_table: true,
+                table_data: tableData,
+                spacing: document.getElementById("mode"+i).checked ? "till_end" : (document.getElementById("lines"+i).value || "1"),
+                spacing_enabled: document.getElementById("mode"+i).checked
+            });
+        } else {
+            // Regular heading
+            headings.push({
+                text: textEl.value || "",
+                font: document.getElementById("font"+i).value || "Calibri",
+                size: document.getElementById("size"+i).value || "16",
+                bold: document.getElementById("bold"+i)?.checked || false,
+                before_lines: document.getElementById("hBefore"+i)?.value || "0",
+                spacing: document.getElementById("mode"+i).checked ? "till_end" : (document.getElementById("lines"+i).value || "1"),
+                text_enabled: document.getElementById("textEnable"+i).checked,
+                text_before: document.getElementById("tBefore"+i)?.value || "0",
+                text_content: document.getElementById("tContent"+i)?.value || "",
+                text_font: document.getElementById("tFont"+i).value || "Calibri",
+                text_size: document.getElementById("tSize"+i).value || "12",
+                text_after: document.getElementById("tAfter"+i)?.value || "0",
+                text_till_end: document.getElementById("tMode"+i).checked || false,
                 image_enabled: document.getElementById("imageEnable"+i).checked,
                 image_data: document.getElementById("imgData"+i)?.value || "",
                 image_width: document.getElementById("imgWidth"+i)?.value || "4",
@@ -1760,6 +2209,38 @@ function collectTemplateData() {
         layout: document.getElementById("layoutSelect").value,
         heading_count: headingCount
     };
+}
+function createTableFromData(item, id) {
+    const div = document.createElement('div');
+    const tableJSON = JSON.stringify(item.table_data);
+
+    div.innerHTML = `
+    <div class="headingBox" id="box${id}" data-is-table="true">
+        <div class="headingHeader" onclick="toggleSection(${id})">
+            <span>📊 Table <span style="background: #9c27b0; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-left: 8px;">${item.table_data.headers.length} columns × ${item.table_data.rows.length} rows</span></span>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" class="btn btn-primary" onclick="editTable(${id}); event.stopPropagation();" style="padding: 4px 12px; font-size: 12px; width: auto; min-height: 32px; margin: 0;">✏️ Edit</button>
+                <button type="button" class="btn btn-danger" onclick="deleteHeading(${id}, event)" style="padding: 4px 12px; font-size: 12px; width: auto; min-height: 32px; margin: 0;">🗑️ Delete</button>
+            </div>
+        </div>
+        <div class="headingContent active" id="content${id}">
+            <input type="hidden" id="tableData${id}" value='${tableJSON.replace(/'/g, "&apos;")}'>
+            <div style="overflow-x: auto; margin-top: 12px;">
+                ${generateTableHTML(item.table_data)}
+            </div>
+            <div style="margin-top: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <label style="flex: 1; min-width: 120px;">Lines after:
+                    <input type="number" id="lines${id}" value="${item.spacing === 'till_end' ? '1' : (item.spacing || '1')}" ${item.spacing === 'till_end' ? 'disabled style="opacity:0.4"' : ''}>
+                </label>
+                <label style="display: flex; align-items: center; margin: 0;">
+                    <input type="checkbox" id="mode${id}" onclick="spacingModeChange(${id})" ${item.spacing === 'till_end' ? 'checked' : ''}>
+                    <span style="margin-left: 8px;">Till End</span>
+                </label>
+            </div>
+        </div>
+    </div>
+    `;
+    document.getElementById('headingContainer').appendChild(div.firstElementChild);
 }
 
 function applyTemplate(template) {
@@ -1789,18 +2270,21 @@ function applyTemplate(template) {
     }
 
     // Build headings with sequential IDs starting from 0
-    if (template.headings && template.headings.length > 0) {
-        template.headings.forEach((item, index) => {
-            headingCount = index; // Set to current index before creating
-            if(item.is_footer) {
-                createFooterFromData(item, index);
-            } else {
-                createHeadingFromData(item, index);
-            }
-        });
-        // Set headingCount to total after all created
-        headingCount = template.headings.length;
-    }
+    // Build headings with sequential IDs starting from 0
+if (template.headings && template.headings.length > 0) {
+    template.headings.forEach((item, index) => {
+        headingCount = index; // Set to current index before creating
+        if(item.is_footer) {
+            createFooterFromData(item, index);
+        } else if(item.is_table) {
+            createTableFromData(item, index);
+        } else {
+            createHeadingFromData(item, index);
+        }
+    });
+    // Set headingCount to total after all created
+    headingCount = template.headings.length;
+}
 
     // Display the code if available
     if (template.template_code || template.code) {
@@ -2001,12 +2485,23 @@ function escapeHtml(text) {
 
 function toggleWM(){
     let wmtext = document.getElementById("wmtext");
+    let wminput = document.getElementById("watermarkText");
     wmtext.classList.toggle("hidden");
+    if(!wmtext.classList.contains("hidden") && wminput){
+        setTimeout(() => wminput.focus(), 100);
+    }
 }
 
 function toggleSection(id){
     let content = document.getElementById("content"+id);
     let header = document.querySelector(`#box${id} .headingHeader`);
+    content.classList.toggle("active");
+    header.classList.toggle("collapsed");
+}
+
+function togglePageSettings(){
+    let content = document.getElementById("pageSettingsContent");
+    let header = document.getElementById("pageSettingsHeader");
     content.classList.toggle("active");
     header.classList.toggle("collapsed");
 }
@@ -2044,19 +2539,24 @@ function deleteHeading(id, event) {
 function renumberHeadings() {
     let boxes = document.querySelectorAll('.headingBox');
     let regularCount = 0;
+    let tableCount = 0;
 
     boxes.forEach((box, index) => {
         let oldId = parseInt(box.id.replace('box', ''));
         let newId = index;
         let isFooter = box.dataset.isFooter === "true";
+        let isTable = box.dataset.isTable === "true";
 
         box.id = 'box' + newId;
 
         // Update header text
         let headerSpan = box.querySelector('.headingHeader span');
-        if(headerSpan && !isFooter) {
+        if(headerSpan && !isFooter && !isTable) {
             headerSpan.textContent = 'Heading ' + (regularCount + 1);
             regularCount++;
+        } else if (headerSpan && isTable) {
+            // Keep table badge but update if needed
+            tableCount++;
         }
 
         let header = box.querySelector('.headingHeader');
@@ -2068,7 +2568,7 @@ function renumberHeadings() {
         // Fix: Properly get and update input IDs
         let inputs = box.querySelectorAll('*[id]');
         inputs.forEach(input => {
-            let oldInputId = input.id;  // ✅ DEFINE oldInputId first!
+            let oldInputId = input.id;
 
             // Only update IDs that end with the old number
             if (oldInputId.endsWith(oldId.toString())) {
@@ -2083,8 +2583,7 @@ function renumberHeadings() {
                     input.setAttribute('onchange', onchange);
                 }
 
-                // Update onclick handlers (except for delete and preview buttons)
-                                // Update onclick handlers (except for delete button)
+                // Update onclick handlers (except for delete button)
                 if(input.hasAttribute('onclick')) {
                     let onclick = input.getAttribute('onclick');
                     if(!onclick.includes('deleteHeading')) {
@@ -2095,12 +2594,8 @@ function renumberHeadings() {
             }
         });
 
-                        let deleteBtn = box.querySelector('.btn-danger');
+        let deleteBtn = box.querySelector('.btn-danger');
         if(deleteBtn) deleteBtn.setAttribute('onclick', 'deleteHeading(' + newId + ', event)');
-
-        // Remove preview button references since we now use global preview
-        let previewBtn = box.querySelector('.btn-info');
-        if(previewBtn) previewBtn.remove();
     });
 
     headingCount = boxes.length;
@@ -2242,9 +2737,12 @@ document.getElementById("mainForm").addEventListener("submit", function(e){
     let headings = [];
     for(let i=0; i<headingCount; i++){
         let textEl = document.getElementById("text"+i);
-        if(!textEl) continue;
+        let boxEl = document.getElementById("box"+i);
 
-        let isFooter = document.getElementById("box"+i)?.dataset.isFooter === "true";
+        if(!boxEl) continue;
+
+        let isFooter = boxEl.dataset.isFooter === "true";
+        let isTable = boxEl.dataset.isTable === "true";
 
         if(isFooter) {
             headings.push({
@@ -2259,11 +2757,21 @@ document.getElementById("mainForm").addEventListener("submit", function(e){
                 text_enabled: document.getElementById("textEnable"+i).checked,
                 text_before: document.getElementById("tBefore"+i)?.value || "0",
                 text_content: document.getElementById("tContent"+i)?.value || "",
-                text_font: document.getElementById("tFont"+i)?.value || "Calibri",
-                text_size: document.getElementById("tSize"+i)?.value || "12",
+                text_font: document.getElementById("tFont"+i).value || "Calibri",
+                text_size: document.getElementById("tSize"+i).value || "12",
                 text_after: document.getElementById("tAfter"+i)?.value || "0",
                 text_till_end: document.getElementById("tMode"+i)?.checked || false,
                 image_enabled: false
+            });
+        } else if (isTable) {
+            let tableDataRaw = document.getElementById("tableData"+i).value;
+            let tableData = JSON.parse(tableDataRaw);
+
+            headings.push({
+                is_table: true,
+                table_data: tableData,
+                spacing: document.getElementById("mode"+i).checked ? "till_end" : (document.getElementById("lines"+i).value || "1"),
+                spacing_enabled: document.getElementById("mode"+i).checked
             });
         } else {
             headings.push({
@@ -2275,11 +2783,11 @@ document.getElementById("mainForm").addEventListener("submit", function(e){
                 spacing: document.getElementById("mode"+i).checked ? "till_end" : (document.getElementById("lines"+i).value || "1"),
                 text_enabled: document.getElementById("textEnable"+i).checked,
                 text_before: document.getElementById("tBefore"+i)?.value || "0",
-                text_content: document.getElementById("tContent"+i)?.value || "",
+                text_content: document.getElementById("tContent"+i).value || "",
                 text_font: document.getElementById("tFont"+i).value || "Calibri",
                 text_size: document.getElementById("tSize"+i).value || "12",
                 text_after: document.getElementById("tAfter"+i).value || "0",
-                text_till_end: document.getElementById("tMode"+i)?.checked || false,
+                text_till_end: document.getElementById("tMode"+i).checked || false,
                 image_enabled: document.getElementById("imageEnable"+i).checked,
                 image_data: document.getElementById("imgData"+i)?.value || "",
                 image_width: document.getElementById("imgWidth"+i)?.value || "4",
@@ -2550,6 +3058,8 @@ function importFromText() {
         showImportError("Network error: " + err);
     });
 }
+
+
 // ============================================
 // AUTO-LOAD TEMPLATE WHEN COMING FROM DASHBOARD
 // ============================================
@@ -2583,6 +3093,71 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 {% endif %}
 </script>
+<!-- TABLE MODAL -->
+<div id="tableModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); overflow-y: auto;">
+    <div style="background: white; margin: 20px auto; padding: 20px; width: 95%; max-width: 800px; border-radius: 8px; position: relative;">
+        <span onclick="closeTableModal()" style="position: absolute; right: 16px; top: 12px; font-size: 32px; font-weight: bold; cursor: pointer; color: #666; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">&times;</span>
+
+        <h3>📊 Convert Text to Table</h3>
+
+        <div style="margin-bottom: 16px;">
+            <label style="font-weight: 600; display: block; margin-bottom: 8px;">Paste your tabular data:</label>
+            <textarea id="tableInput" rows="8"
+    placeholder="no  date  time&#10;1  26  15&#10;2  30  36"
+    style="width: 100%; padding: 12px; font-family: monospace; font-size: 14px; border: 1px solid #ddd; border-radius: 6px; resize: vertical;">
+</textarea>
+<p style="font-size: 12px; color: #666; margin-top: 6px;">
+    First line = headers. Use <strong>TABS</strong> or <strong>DOUBLE SPACES</strong> to separate columns.
+</p>
+        </div>
+
+        <button type="button" class="btn btn-primary" onclick="previewTable()" style="width: 100%; margin-bottom: 16px;">Preview Table</button>
+
+        <div id="tablePreviewSection" style="display: none; margin-bottom: 16px;">
+            <h4>Preview:</h4>
+            <div id="tablePreviewContainer" style="overflow-x: auto; background: #f5f5f5; padding: 16px; border-radius: 6px; margin-bottom: 12px;"></div>
+        </div>
+
+        <button type="button" class="btn btn-success" onclick="addTableToDocument()" style="width: 100%;">Add Table to Document</button>
+    </div>
+</div>
+
+<!-- EDIT TABLE MODAL -->
+<div id="editTableModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); overflow-y: auto;">
+    <div style="background: white; margin: 20px auto; padding: 20px; width: 95%; max-width: 800px; border-radius: 8px; position: relative;">
+        <span onclick="closeEditTableModal()" style="position: absolute; right: 16px; top: 12px; font-size: 32px; font-weight: bold; cursor: pointer; color: #666; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">&times;</span>
+
+        <h3>✏️ Edit Table</h3>
+
+        <div style="margin-bottom: 16px;">
+            <label style="font-weight: 600; display: block; margin-bottom: 8px;">Edit your tabular data:</label>
+            <textarea id="editTableInput" rows="8" placeholder="no  date  time&#10;1  26  15&#10;2  30  36" style="width: 100%; padding: 12px; font-family: monospace; font-size: 14px; border: 1px solid #ddd; border-radius: 6px; resize: vertical;"></textarea>
+            <p style="font-size: 12px; color: #666; margin-top: 6px;">Use <strong>TABS</strong> or <strong>DOUBLE SPACES</strong> to separate columns.</p>
+        </div>
+
+        <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+            <label style="flex: 1; min-width: 120px;">Lines after:
+                <input type="number" id="editTableSpacing" value="1" min="0" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px;">
+            </label>
+            <label style="display: flex; align-items: center; margin: 0; cursor: pointer;">
+                <input type="checkbox" id="editTableTillEnd" onchange="toggleEditTableSpacing()" style="width: 20px; height: 20px; margin-right: 8px;">
+                <span>Till End</span>
+            </label>
+        </div>
+
+        <button type="button" class="btn btn-primary" onclick="previewEditTable()" style="width: 100%; margin-bottom: 16px;">Preview Table</button>
+
+        <div id="editTablePreviewSection" style="display: none; margin-bottom: 16px;">
+            <h4>Preview:</h4>
+            <div id="editTablePreviewContainer" style="overflow-x: auto; background: #f5f5f5; padding: 16px; border-radius: 6px; margin-bottom: 12px;"></div>
+        </div>
+
+        <div style="display: flex; gap: 12px;">
+            <button type="button" class="btn btn-success" onclick="saveTableEdit()" style="flex: 1;">💾 Save Changes</button>
+            <button type="button" class="btn btn-secondary" onclick="closeEditTableModal()" style="flex: 1; background: #757575; color: white;">Cancel</button>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>
