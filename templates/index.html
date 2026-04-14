@@ -2734,6 +2734,8 @@ window.onclick = function(event){
 // Form submission
 // Form submission
 document.getElementById("mainForm").addEventListener("submit", function(e){
+    e.preventDefault(); // STOP the form from submitting immediately
+
     let headings = [];
     for(let i=0; i<headingCount; i++){
         let textEl = document.getElementById("text"+i);
@@ -2756,10 +2758,10 @@ document.getElementById("mainForm").addEventListener("submit", function(e){
                 spacing: document.getElementById("mode"+i).checked ? "till_end" : (document.getElementById("lines"+i).value || "0"),
                 text_enabled: document.getElementById("textEnable"+i).checked,
                 text_before: document.getElementById("tBefore"+i)?.value || "0",
-                text_content: document.getElementById("tContent"+i)?.value || "",
+                text_content: document.getElementById("tContent"+i).value || "",
                 text_font: document.getElementById("tFont"+i).value || "Calibri",
                 text_size: document.getElementById("tSize"+i).value || "12",
-                text_after: document.getElementById("tAfter"+i)?.value || "0",
+                text_after: document.getElementById("tAfter"+i).value || "0",
                 text_till_end: document.getElementById("tMode"+i)?.checked || false,
                 image_enabled: false
             });
@@ -2798,7 +2800,12 @@ document.getElementById("mainForm").addEventListener("submit", function(e){
             });
         }
     }
+
+    // Update the hidden field
     document.getElementById("headingsData").value = JSON.stringify(headings);
+
+    // NOW submit the form after data is collected
+    this.submit();
 });
 
 document.addEventListener('DOMContentLoaded', function() {
