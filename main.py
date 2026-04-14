@@ -134,6 +134,47 @@ def delete_template(template_id):
 # ==================== YOUR EXISTING DOCUMENT CODE ====================
 # (Keep all your existing functions: add_page_border, add_watermark, etc.)
 # Just paste them here after the auth routes
+def add_table_to_doc(doc, table_data, spacing_after=1, till_end=False):
+    """Add a table to the document from JSON data"""
+    from docx.shared import Inches
+
+    headers = table_data.get('headers', [])
+    rows = table_data.get('rows', [])
+
+    if not headers:
+        return
+
+    # Create table
+    table = doc.add_table(rows=1, cols=len(headers))
+    table.style = 'Table Grid'
+
+    # Add headers
+    header_cells = table.rows[0].cells
+    for i, header in enumerate(headers):
+        header_cells[i].text = str(header)
+        # Make header bold
+        for paragraph in header_cells[i].paragraphs:
+            for run in paragraph.runs:
+                run.font.bold = True
+
+    # Add data rows
+    for row_data in rows:
+        row_cells = table.add_row().cells
+        for i, cell_value in enumerate(row_data):
+            if i < len(row_cells):
+                row_cells[i].text = str(cell_value) if cell_value else ""
+
+    # Set column widths (optional - makes it look better)
+    for row in table.rows:
+        for cell in row.cells:
+            cell.width = Inches(1.2)
+
+    # Handle spacing after table
+    if till_end:
+        doc.add_page_break()
+    else:
+        for _ in range(int(spacing_after)):
+            doc.add_paragraph("")
 
 def add_footer_to_section(section, item):
     """Add footer text to a specific section (last page only)"""
@@ -223,6 +264,16 @@ def add_headings(doc, headings_data):
 
     for idx, item in enumerate(headings_data):
         print(f"\n--- Heading {idx + 1} ---")
+
+        # Handle tables
+        if item.get("is_table"):
+            table_data = item.get("table_data", {})
+            spacing = item.get("spacing", "1")
+            till_end = (spacing == "till_end")
+            spacing_val = 0 if till_end else int(spacing)
+
+            add_table_to_doc(doc, table_data, spacing_val, till_end)
+            continue
 
         try:
             before_lines = int(item.get("before_lines", 0))
