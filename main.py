@@ -15,39 +15,36 @@ import uuid
 import os
 from models import db, User, Template
 
-# Initialize Flask app
+
 app = Flask(__name__, template_folder="templates")
 
-# Configuration
-app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'  # Change this to a random string
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///record_generator.db'  # Creates database file
+
+app.config['SECRET_KEY'] = ''  
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///record_generator.db' 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024
 
-# Initialize extensions
+
 db.init_app(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'login'  # Where to go if not logged in
+login_manager.login_view = 'login'  
 login_manager.login_message = "Please log in to access this page."
 
 nsmap['v'] = 'urn:schemas-microsoft-com:vml'
 
 
-# User loader for Flask-Login
-@login_manager.user_loader
+
+
 def load_user(user_id):
     return User.query.get(int(user_id))
 
 
-# Create database tables
+
 with app.app_context():
     db.create_all()
     print("Database tables created!")
-
-
-# ==================== AUTHENTICATION ROUTES ====================
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
@@ -56,7 +53,7 @@ def register():
         email = request.form.get('email')
         password = request.form.get('password')
 
-        # Check if user exists
+
         if User.query.filter_by(username=username).first():
             flash('Username already exists!', 'error')
             return redirect(url_for('register'))
@@ -65,7 +62,7 @@ def register():
             flash('Email already registered!', 'error')
             return redirect(url_for('register'))
 
-        # Hash password and create user
+
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
         new_user = User(username=username, email=email, password_hash=hashed_password)
         db.session.add(new_user)
@@ -103,13 +100,12 @@ def logout():
     return redirect(url_for('login'))
 
 
-# ==================== TEMPLATE DASHBOARD (NEW) ====================
+
 
 @app.route("/dashboard")
 @login_required
 def dashboard():
     """Template selection page - shows user's templates"""
-    # Get all templates for current user
     user_templates = Template.query.filter_by(user_id=current_user.id).order_by(Template.updated_at.desc()).all()
     return render_template("dashboard.html", templates=user_templates, username=current_user.username)
 
@@ -120,7 +116,6 @@ def delete_template(template_id):
     """Delete a template"""
     template = Template.query.get_or_404(template_id)
 
-    # Verify ownership
     if template.user_id != current_user.id:
         flash('You cannot delete this template!', 'error')
         return redirect(url_for('dashboard'))
@@ -130,10 +125,6 @@ def delete_template(template_id):
     flash('Template deleted!', 'success')
     return redirect(url_for('dashboard'))
 
-
-# ==================== YOUR EXISTING DOCUMENT CODE ====================
-# (Keep all your existing functions: add_page_border, add_watermark, etc.)
-# Just paste them here after the auth routes
 def add_table_to_doc(doc, table_data, spacing_after=1, till_end=False):
     """Add a table to the document from JSON data"""
     from docx.shared import Inches
@@ -144,32 +135,28 @@ def add_table_to_doc(doc, table_data, spacing_after=1, till_end=False):
     if not headers:
         return
 
-    # Create table
     table = doc.add_table(rows=1, cols=len(headers))
     table.style = 'Table Grid'
 
-    # Add headers
     header_cells = table.rows[0].cells
     for i, header in enumerate(headers):
         header_cells[i].text = str(header)
-        # Make header bold
+
         for paragraph in header_cells[i].paragraphs:
             for run in paragraph.runs:
                 run.font.bold = True
 
-    # Add data rows
     for row_data in rows:
         row_cells = table.add_row().cells
         for i, cell_value in enumerate(row_data):
             if i < len(row_cells):
                 row_cells[i].text = str(cell_value) if cell_value else ""
 
-    # Set column widths (optional - makes it look better)
     for row in table.rows:
         for cell in row.cells:
             cell.width = Inches(1.2)
 
-    # Handle spacing after table
+
     if till_end:
         doc.add_page_break()
     else:
@@ -265,7 +252,6 @@ def add_headings(doc, headings_data):
     for idx, item in enumerate(headings_data):
         print(f"\n--- Heading {idx + 1} ---")
 
-        # Handle tables
         if item.get("is_table"):
             table_data = item.get("table_data", {})
             spacing = item.get("spacing", "1")
@@ -353,7 +339,6 @@ def add_headings(doc, headings_data):
                 print(f"Error adding image: {str(e)}")
 
 
-# ==================== MODIFIED API ROUTES ====================
 
 @app.route("/save_template", methods=["POST"])
 @login_required
@@ -363,7 +348,6 @@ def save_template():
         data = request.json
         template_code = str(uuid.uuid4())[:8].upper()
 
-        # If updating existing template, find it
         existing_id = data.get('template_id')
         if existing_id:
             template = Template.query.get(existing_id)
@@ -373,7 +357,6 @@ def save_template():
                 db.session.commit()
                 return jsonify({'success': True, 'code': template.code, 'id': template.id})
 
-        # Create new template
         new_template = Template(
             user_id=current_user.id,
             name=data.get('template_name', f'Template {template_code}'),
@@ -405,10 +388,6 @@ def load_template(code):
 
     if not template:
         return jsonify({'success': False, 'error': 'Template not found'})
-
-    # Check if user owns this template or if it's being shared
-    #if template.user_id != current_user.id:
-    #   return jsonify({'success': False, 'error': 'Access denied'})
 
     template_data = json.loads(template.data_json)
     template_data['template_id'] = template.id
